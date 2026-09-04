@@ -22,11 +22,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.habittracker.data.HabitDatabase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 private const val PREFS_NAME = "habit_tracker"
 private const val THEME_KEY = "theme_mode"
@@ -49,6 +52,7 @@ fun SettingsScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val database = remember { HabitDatabase.getInstance(context) }
+    val scope = rememberCoroutineScope()
     var showResetDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
@@ -146,7 +150,7 @@ fun SettingsScreen(
                 Button(
                     onClick = {
                         showResetDialog = false
-                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        scope.launch(Dispatchers.IO) {
                             database.habitCompletionDao().deleteAll()
                             database.habitDao().deleteAll()
                             context.getSharedPreferences(PREFS_NAME, 0)
