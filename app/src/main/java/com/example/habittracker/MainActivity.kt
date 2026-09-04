@@ -26,6 +26,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -55,6 +56,7 @@ import com.example.habittracker.data.currentWeekDateRange
 import com.example.habittracker.data.formatDate
 import com.example.habittracker.data.isHabitScheduledToday
 import com.example.habittracker.ui.theme.HabitTrackerTheme
+import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.flow.first
@@ -193,6 +195,12 @@ private fun HabitHomeScreen() {
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
+                Text(
+                    SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(todayDate),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
             }
         },
         floatingActionButton = {
@@ -309,15 +317,44 @@ private fun HabitHomeScreen() {
 
 @Composable
 private fun TodaySummary(total: Int, completed: Int) {
+    val progress = if (total == 0) 0f else completed.toFloat() / total.toFloat()
+    val remaining = (total - completed).coerceAtLeast(0)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Text("Today", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(6.dp))
-            Text("$completed of $total scheduled habits completed", style = MaterialTheme.typography.bodyLarge)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text("Today's progress", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("$completed of $total completed", style = MaterialTheme.typography.bodyMedium)
+                }
+                Text(
+                    "${(progress * 100).toInt()}%",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)),
+                trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Completed: $completed", style = MaterialTheme.typography.labelMedium)
+                Text("Remaining: $remaining", style = MaterialTheme.typography.labelMedium)
+            }
         }
     }
 }
