@@ -18,19 +18,16 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -60,7 +57,7 @@ fun HistoryScreen() {
 
     val selectedHabit = habits.firstOrNull { it.id == selectedHabitId } ?: habits.firstOrNull()
 
-    androidx.compose.runtime.LaunchedEffect(habits) {
+    LaunchedEffect(habits) {
         if (selectedHabitId == -1 && habits.isNotEmpty()) {
             selectedHabitId = habits.first().id
         } else if (habits.none { it.id == selectedHabitId }) {
@@ -99,10 +96,17 @@ fun HistoryScreen() {
             onNext = { monthOffset++ }
         )
 
-        val month = remember(monthOffset) { Calendar.getInstance().apply { add(Calendar.MONTH, monthOffset) } }
+        val month = remember(monthOffset) {
+            Calendar.getInstance().apply { add(Calendar.MONTH, monthOffset) }
+        }
         val monthData = remember(month.timeInMillis) { buildMonthData(month) }
-        val startDate = monthData.first().date
-        val endDate = monthData.last().date
+        val rangeFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
+        val firstDate = (month.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1) }
+        val lastDate = (month.clone() as Calendar).apply {
+            set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
+        }
+        val startDate = rangeFormatter.format(firstDate.time)
+        val endDate = rangeFormatter.format(lastDate.time)
         val completedDates by database.habitCompletionDao()
             .observeCompletedDates(selectedHabit.id, startDate, endDate)
             .collectAsStateWithLifecycle(initialValue = emptyList())
@@ -111,8 +115,10 @@ fun HistoryScreen() {
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(7),
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -127,7 +133,9 @@ fun HistoryScreen() {
         val completedCount = completedDates.size
         val totalDays = monthData.count { it.dayOfMonth > 0 }
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.secondaryContainer
@@ -135,14 +143,14 @@ fun HistoryScreen() {
         ) {
             Row(
                 modifier = Modifier.padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("This month", fontWeight = FontWeight.SemiBold)
                     Text("$completedCount completed days")
                 }
                 Text(
-                    text = if (totalDays == 0) "0%" else "${completedCount * 100 / totalDays}%",
+                    text = "${completedCount * 100 / totalDays}%",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -215,13 +223,9 @@ private fun MonthHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        IconButton(onClick = onPrevious) {
-            Icon(Icons.Default.ChevronLeft, contentDescription = "Previous month")
-        }
+        TextButton(onClick = onPrevious) { Text("‹") }
         Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        IconButton(onClick = onNext) {
-            Icon(Icons.Default.ChevronRight, contentDescription = "Next month")
-        }
+        TextButton(onClick = onNext) { Text("›") }
     }
 }
 
