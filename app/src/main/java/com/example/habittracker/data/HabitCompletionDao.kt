@@ -12,6 +12,16 @@ interface HabitCompletionDao {
     fun observeCompletedHabitIds(date: String): Flow<List<Int>>
 
     @Query(
+        "SELECT habitId FROM habit_completions " +
+            "WHERE date BETWEEN :startDate AND :endDate " +
+            "GROUP BY habitId"
+    )
+    fun observeCompletedHabitIdsBetween(
+        startDate: String,
+        endDate: String
+    ): Flow<List<Int>>
+
+    @Query(
         "SELECT date FROM habit_completions " +
             "WHERE habitId = :habitId AND date BETWEEN :startDate AND :endDate " +
             "ORDER BY date ASC"
@@ -21,6 +31,17 @@ interface HabitCompletionDao {
         startDate: String,
         endDate: String
     ): Flow<List<String>>
+
+    @Query(
+        "SELECT date FROM habit_completions " +
+            "WHERE habitId = :habitId AND date BETWEEN :startDate AND :endDate " +
+            "ORDER BY date DESC LIMIT 1"
+    )
+    suspend fun getLatestCompletionDate(
+        habitId: Int,
+        startDate: String,
+        endDate: String
+    ): String?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(completion: HabitCompletionEntity)
