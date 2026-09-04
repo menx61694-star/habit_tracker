@@ -5,7 +5,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,17 +33,22 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.habittracker.data.HabitDatabase
+import com.example.habittracker.data.HabitEntity
 import com.example.habittracker.ui.theme.HabitTrackerTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,22 +66,25 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private data class HabitItem(
-    val id: Int,
-    val name: String,
-    val doneToday: Boolean = false
-)
-
 @Composable
 private fun HabitHomeScreen() {
-    val habits = remember {
-        mutableStateListOf(
-            HabitItem(1, "Drink Water"),
-            HabitItem(2, "Walk 30 Minutes")
-        )
-    }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val database = remember { HabitDatabase.getInstance(context) }
+    val dao = database.habitDao()
+    val habits by dao.observeHabits().collectAsStateWithLifecycle(initialValue = emptyList())
+    val scope = rememberCoroutineScope()
     var showAddDialog by remember { mutableStateOf(false) }
-    var nextId by remember { mutableStateOf(3) }
+
+    LaunchedEffect(Unit) {
+        val preferences = context.getSharedPreferences("habit_tracker", 0)
+        if (!preferences.getBoolean("defaults_created", false)) {
+            if (dao.observeHabits().first().isEmpty()) {
+                dao.insert(HabitEntity(name = "Drink Water"))
+                dao.insert(HabitEntity(name = "Walk 30 Minutes"))
+            }
+            preferences.edit().putBoolean("defaults_created", true).apply()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -111,27 +121,24 @@ private fun HabitHomeScreen() {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                contentPadding = PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
                     bottom = 96.dp
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item {
-                    TodaySummary(habits = habits)
-                }
+                item { TodaySummary(habits = habits) }
                 items(habits, key = { it.id }) { habit ->
                     HabitCard(
                         habit = habit,
                         onToggle = {
-                            val index = habits.indexOfFirst { it.id == habit.id }
-                            if (index >= 0) {
-                                habits[index] = habit.copy(doneToday = !habit.doneToday)
+                            scope.launch {
+                                dao.update(habit.copy(doneToday = !habit.doneToday))
                             }
                         },
                         onDelete = {
-                            habits.removeAll { it.id == habit.id }
+                            scope.launch { dao.delete(habit) }
                         }
                     )
                 }
@@ -143,8 +150,7 @@ private fun HabitHomeScreen() {
         AddHabitDialog(
             onDismiss = { showAddDialog = false },
             onAdd = { name ->
-                habits.add(HabitItem(nextId, name))
-                nextId++
+                scope.launch { dao.insert(HabitEntity(name = name)) }
                 showAddDialog = false
             }
         )
@@ -152,7 +158,7 @@ private fun HabitHomeScreen() {
 }
 
 @Composable
-private fun TodaySummary(habits: List<HabitItem>) {
+private fun TodaySummary(habits: List<HabitEntity>) {
     val completed = habits.count { it.doneToday }
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -178,7 +184,7 @@ private fun TodaySummary(habits: List<HabitItem>) {
 
 @Composable
 private fun HabitCard(
-    habit: HabitItem,
+    habit: HabitEntity,
     onToggle: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -245,7 +251,7 @@ private fun BoxIndicator(done: Boolean) {
     } else {
         MaterialTheme.colorScheme.surfaceVariant
     }
-    androidx.compose.foundation.layout.Box(
+    Box(
         modifier = Modifier
             .size(12.dp)
             .clip(CircleShape)
