@@ -35,6 +35,17 @@ interface HabitCompletionDao {
     @Query(
         "SELECT date FROM habit_completions " +
             "WHERE habitId = :habitId AND date BETWEEN :startDate AND :endDate " +
+            "ORDER BY date ASC"
+    )
+    fun observeCompletedDatesForYear(
+        habitId: Int,
+        startDate: String,
+        endDate: String
+    ): Flow<List<String>>
+
+    @Query(
+        "SELECT date FROM habit_completions " +
+            "WHERE habitId = :habitId AND date BETWEEN :startDate AND :endDate " +
             "ORDER BY date DESC LIMIT 1"
     )
     suspend fun getLatestCompletionDate(
