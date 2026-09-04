@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -289,6 +290,7 @@ private fun HabitCard(
     onDelete: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+    val accent = habitAccentColor(habit.color)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -299,7 +301,14 @@ private fun HabitCard(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BoxIndicator(doneToday)
+            Box(
+                modifier = Modifier
+                    .size(width = 5.dp, height = 48.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(accent)
+            )
+            Spacer(modifier = Modifier.size(12.dp))
+            BoxIndicator(doneToday, accent)
             Spacer(modifier = Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -338,9 +347,16 @@ private fun HabitCard(
 }
 
 @Composable
-private fun BoxIndicator(done: Boolean) {
-    val color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+private fun BoxIndicator(done: Boolean, accent: Color) {
+    val color = if (done) accent else MaterialTheme.colorScheme.surfaceVariant
     Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(color))
+}
+
+private fun habitAccentColor(color: String): Color = when (color.lowercase(Locale.US)) {
+    "blue" -> Color(0xFF4F7FD4)
+    "orange" -> Color(0xFFD47A2C)
+    "purple" -> Color(0xFF8758C7)
+    else -> Color(0xFF2E8B68)
 }
 
 @Composable
