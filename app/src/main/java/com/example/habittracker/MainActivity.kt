@@ -26,6 +26,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -55,6 +57,11 @@ import java.util.Locale
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+private enum class AppTab {
+    Home,
+    History
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,8 +71,43 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    HabitHomeScreen()
+                    HabitApp()
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HabitApp() {
+    var selectedTab by remember { mutableStateOf(AppTab.Home) }
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = selectedTab == AppTab.Home,
+                    onClick = { selectedTab = AppTab.Home },
+                    icon = { Text("✓") },
+                    label = { Text("Today") }
+                )
+                NavigationBarItem(
+                    selected = selectedTab == AppTab.History,
+                    onClick = { selectedTab = AppTab.History },
+                    icon = { Text("▦") },
+                    label = { Text("History") }
+                )
+            }
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            when (selectedTab) {
+                AppTab.Home -> HabitHomeScreen()
+                AppTab.History -> HistoryScreen()
             }
         }
     }
