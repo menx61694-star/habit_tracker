@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -318,6 +317,147 @@ private fun StatItem(label: String, value: String, modifier: Modifier) {
 }
 
 @Composable
+private fun EmptyHistory() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("No history yet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("Create a habit to start tracking your progress.")
+    }
+}
+
+@Composable
+private fun HabitPicker(
+    habits: List<HabitEntity>,
+    selectedHabit: HabitEntity,
+    onSelected: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .clickable { expanded = true },
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("${selectedHabit.icon} ${selectedHabit.name}", modifier = Modifier.weight(1f))
+                Text("▾")
+            }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            habits.forEach { habit ->
+                DropdownMenuItem(
+                    text = { Text("${habit.icon} ${habit.name}") },
+                    onClick = {
+                        onSelected(habit.id)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+private data class CalendarDayData(
+    val key: String,
+    val date: String,
+    val day: Int?,
+    val isToday: Boolean
+)
+
+private fun buildMonthData(month: Calendar): List<CalendarDayData> {
+    val firstDay = monthStart(month)
+    val leadingDays = ((firstDay.get(Calendar.DAY_OF_WEEK) + 5) % 7)
+    val maxDay = month.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val today = Calendar.getInstance()
+    val result = mutableListOf<CalendarDayData>()
+
+    repeat(leadingDays) { index ->
+        result += CalendarDayData("empty-$index", "", null, false)
+    }
+    for (day in 1..maxDay) {
+        val date = (month.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, day) }
+        result += CalendarDayData(
+            key = formatStatsDate(date),
+            date = formatStatsDate(date),
+            day = day,
+            isToday = date.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
+                date.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
+        )
+    }
+    return result
+}
+
+@Composable
+private fun CalendarLegend() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Mon", style = MaterialTheme.typography.labelSmall)
+        Text("Tue", style = MaterialTheme.typography.labelSmall)
+        Text("Wed", style = MaterialTheme.typography.labelSmall)
+        Text("Thu", style = MaterialTheme.typography.labelSmall)
+        Text("Fri", style = MaterialTheme.typography.labelSmall)
+        Text("Sat", style = MaterialTheme.typography.labelSmall)
+        Text("Sun", style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+private fun CalendarDay(day: CalendarDayData, completed: Boolean) {
+    if (day.day == null) {
+        Spacer(modifier = Modifier.size(36.dp))
+        return
+    }
+    val background = when {
+        completed -> MaterialTheme.colorScheme.primary
+        day.isToday -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(background),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = day.day.toString(),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (day.isToday || completed) FontWeight.Bold else FontWeight.Normal,
+            color = if (completed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun MonthHeader(monthOffset: Int, onPrevious: () -> Unit, onNext: () -> Unit) {
+    val month = remember(monthOffset) { monthCalendar(monthOffset) }
+    val title = remember(month.timeInMillis) {
+        SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.time)
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        TextButton(onClick = onPrevious) { Text("‹") }
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        TextButton(onClick = onNext) { Text("›") }
+    }
+}
+
+@Composable
 private fun MonthStatsCard(
     completedCount: Int,
     completionRate: Int,
@@ -327,11 +467,14 @@ private fun MonthStatsCard(
     Card(
         modifier = Modifier.fillMaxWidth().then(modifier),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
-        Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
             StatItem("Completed", "$completedCount", Modifier.weight(1f))
-            StatItem("Success", "$completionRate%", Modifier.weight(1f))
+            StatItem("Completion", "$completionRate%", Modifier.weight(1f))
             StatItem("Best streak", "$bestStreak", Modifier.weight(1f))
         }
     }
@@ -350,11 +493,11 @@ private fun completedOpportunityCountForRange(
     end: Calendar,
     completedDates: List<String>
 ): Int {
-    val scheduled = com.example.habittracker.data.scheduledDatesInRange(habit.frequency, start, end).toSet()
+    val scheduled = scheduledOpportunityCount(habit.frequency, start, end).toSet()
     if (scheduled.isEmpty()) return 0
     return if (habit.frequency.equals("weekly", ignoreCase = true)) {
         completedDates.mapNotNull { parseStatsDate(it) }
-            .map { weekStartForStats(it) }
+            .map { statsWeekStart(it) }
             .toSet()
             .count { it in scheduled }
     } else {
@@ -362,142 +505,41 @@ private fun completedOpportunityCountForRange(
     }
 }
 
-private fun scheduledOpportunityCount(frequency: String, start: Calendar, end: Calendar): Int =
-    com.example.habittracker.data.scheduledDatesInRange(frequency, start, end).size
+private fun scheduledOpportunityCount(
+    frequency: String,
+    start: Calendar,
+    end: Calendar
+): Int = when {
+    frequency.equals("weekly", ignoreCase = true) -> {
+        val weeks = linkedSetOf<String>()
+        val cursor = start.clone() as Calendar
+        while (!cursor.after(end)) {
+            weeks += statsWeekStart(cursor)
+            cursor.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        weeks.size
+    }
+    else -> {
+        var count = 0
+        val cursor = start.clone() as Calendar
+        while (!cursor.after(end)) {
+            if (!frequency.equals("weekdays", ignoreCase = true) ||
+                cursor.get(Calendar.DAY_OF_WEEK) in Calendar.MONDAY..Calendar.FRIDAY
+            ) count++
+            cursor.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        count
+    }
+}
 
 private fun parseStatsDate(value: String): Calendar? = runCatching {
     val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(value) ?: return null
     Calendar.getInstance().apply { time = date }
 }.getOrNull()
 
-private fun weekStartForStats(date: Calendar): String {
+private fun statsWeekStart(date: Calendar): String {
     val monday = date.clone() as Calendar
     monday.firstDayOfWeek = Calendar.MONDAY
     monday.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-    return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(monday.time)
-}
-
-@Composable
-private fun HabitPicker(
-    habits: List<HabitEntity>,
-    selectedHabit: HabitEntity,
-    onSelected: (Int) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .clickable { expanded = true },
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(14.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Habit", style = MaterialTheme.typography.labelMedium)
-                    Text(selectedHabit.name, fontWeight = FontWeight.SemiBold)
-                }
-                Text("Change", color = MaterialTheme.colorScheme.primary)
-            }
-        }
-
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            habits.forEach { habit ->
-                DropdownMenuItem(
-                    text = { Text(habit.name) },
-                    onClick = {
-                        onSelected(habit.id)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MonthHeader(monthOffset: Int, onPrevious: () -> Unit, onNext: () -> Unit) {
-    val month = remember(monthOffset) { monthCalendar(monthOffset) }
-    val title = remember(month.timeInMillis) {
-        SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.time)
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        TextButton(onClick = onPrevious) { Text("‹") }
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        TextButton(onClick = onNext) { Text("›") }
-    }
-}
-
-@Composable
-private fun CalendarLegend() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceAround
-    ) {
-        listOf("S", "M", "T", "W", "T", "F", "S").forEach {
-            Text(it, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-private fun EmptyHistory() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("No history yet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("Complete a habit to start building your history.")
-    }
-}
-
-private data class CalendarDayData(val key: String, val date: String, val day: Int?, val inMonth: Boolean)
-
-private fun buildMonthData(month: Calendar): List<CalendarDayData> {
-    val first = monthStart(month)
-    val firstDay = first.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY
-    val daysInMonth = first.getActualMaximum(Calendar.DAY_OF_MONTH)
-    val result = mutableListOf<CalendarDayData>()
-    repeat(firstDay) { index -> result += CalendarDayData("leading-$index", "", null, false) }
-    for (day in 1..daysInMonth) {
-        val date = (first.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, day) }
-        result += CalendarDayData(
-            key = formatStatsDate(date),
-            date = formatStatsDate(date),
-            day = day,
-            inMonth = true
-        )
-    }
-    return result
-}
-
-@Composable
-private fun CalendarDay(day: CalendarDayData, completed: Boolean) {
-    if (!day.inMonth) {
-        Spacer(modifier = Modifier.size(38.dp))
-        return
-    }
-    val background = if (completed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val content = if (completed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-    Box(
-        modifier = Modifier
-            .size(38.dp)
-            .clip(CircleShape)
-            .background(background),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("${day.day}", color = content, style = MaterialTheme.typography.labelMedium)
-    }
+    return formatStatsDate(monday)
 }
