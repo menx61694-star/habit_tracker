@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -450,62 +451,53 @@ private fun CalendarLegend() {
 }
 
 @Composable
-private fun CalendarDay(day: CalendarDayData, completed: Boolean) {
-    if (day.dayOfMonth == 0) {
-        Spacer(modifier = Modifier.size(42.dp))
-        return
-    }
-
-    val background = if (completed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val textColor = if (completed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-
-    Box(
-        modifier = Modifier.size(42.dp).clip(CircleShape).background(background),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = day.dayOfMonth.toString(),
-            color = textColor,
-            fontWeight = if (completed) FontWeight.Bold else FontWeight.Normal
-        )
-    }
-}
-
-@Composable
 private fun EmptyHistory() {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("No habits to show", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("No history yet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Add a habit first, then its history will appear here.")
+        Text("Complete a habit to start building your history.")
     }
 }
 
-private data class CalendarDayData(val key: String, val date: String, val dayOfMonth: Int)
+private data class CalendarDayData(val key: String, val date: String, val day: Int?, val inMonth: Boolean)
 
 private fun buildMonthData(month: Calendar): List<CalendarDayData> {
-    val first = month.clone() as Calendar
-    first.set(Calendar.DAY_OF_MONTH, 1)
+    val first = monthStart(month)
+    val firstDay = first.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY
     val daysInMonth = first.getActualMaximum(Calendar.DAY_OF_MONTH)
-    val firstDayOfWeek = first.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY
     val result = mutableListOf<CalendarDayData>()
-
-    repeat(firstDayOfWeek) { index -> result += CalendarDayData("empty-$index", "", 0) }
-
-    val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    repeat(firstDay) { index -> result += CalendarDayData("leading-$index", "", null, false) }
     for (day in 1..daysInMonth) {
-        val date = first.clone() as Calendar
-        date.set(Calendar.DAY_OF_MONTH, day)
-        val formatted = formatter.format(date.time)
-        result += CalendarDayData(formatted, formatted, day)
-    }
-
-    while (result.size % 7 != 0) {
-        val index = result.size
-        result += CalendarDayData("empty-$index", "", 0)
+        val date = (first.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, day) }
+        result += CalendarDayData(
+            key = formatStatsDate(date),
+            date = formatStatsDate(date),
+            day = day,
+            inMonth = true
+        )
     }
     return result
+}
+
+@Composable
+private fun CalendarDay(day: CalendarDayData, completed: Boolean) {
+    if (!day.inMonth) {
+        Spacer(modifier = Modifier.size(38.dp))
+        return
+    }
+    val background = if (completed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val content = if (completed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(background),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("${day.day}", color = content, style = MaterialTheme.typography.labelMedium)
+    }
 }
