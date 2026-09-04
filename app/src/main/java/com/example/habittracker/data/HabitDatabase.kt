@@ -12,7 +12,7 @@ import java.util.Locale
 
 @Database(
     entities = [HabitEntity::class, HabitCompletionEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class HabitDatabase : RoomDatabase() {
@@ -47,6 +47,15 @@ abstract class HabitDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE habits ADD COLUMN icon TEXT NOT NULL DEFAULT '✓'")
+                db.execSQL("ALTER TABLE habits ADD COLUMN category TEXT NOT NULL DEFAULT 'General'")
+                db.execSQL("ALTER TABLE habits ADD COLUMN color TEXT NOT NULL DEFAULT 'green'")
+                db.execSQL("ALTER TABLE habits ADD COLUMN frequency TEXT NOT NULL DEFAULT 'Daily'")
+            }
+        }
+
         @Volatile
         private var INSTANCE: HabitDatabase? = null
 
@@ -57,7 +66,7 @@ abstract class HabitDatabase : RoomDatabase() {
                     HabitDatabase::class.java,
                     "habit_tracker.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { INSTANCE = it }
             }
