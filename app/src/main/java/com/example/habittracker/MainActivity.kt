@@ -45,9 +45,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.habittracker.data.HabitCompletionEntity
 import com.example.habittracker.data.HabitDatabase
 import com.example.habittracker.data.HabitEntity
 import com.example.habittracker.ui.theme.HabitTrackerTheme
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -71,17 +75,21 @@ class MainActivity : ComponentActivity() {
 private fun HabitHomeScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val database = remember { HabitDatabase.getInstance(context) }
-    val dao = database.habitDao()
-    val habits by dao.observeHabits().collectAsStateWithLifecycle(initialValue = emptyList())
+    val habitDao = database.habitDao()
+    val completionDao = database.habitCompletionDao()
+    val habits by habitDao.observeHabits().collectAsStateWithLifecycle(initialValue = emptyList())
+    val today = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) }
+    val completedIds by completionDao.observeCompletedHabitIds(today)
+        .collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = rememberCoroutineScope()
     var showAddDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val preferences = context.getSharedPreferences("habit_tracker", 0)
         if (!preferences.getBoolean("defaults_created", false)) {
-            if (dao.observeHabits().first().isEmpty()) {
-                dao.insert(HabitEntity(name = "Drink Water"))
-                dao.insert(HabitEntity(name = "Walk 30 Minutes"))
+            if (habitDao.observeHabits().first().isEmpty()) {
+                habitDao.insert(HabitEntity(name = "Drink Water"))
+                habitDao.insert(HabitEntity(name = "Walk 30 Minutes"))
             }
             preferences.edit().putBoolean("defaults_created", true).apply()
         }
@@ -129,17 +137,36 @@ private fun HabitHomeScreen() {
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item { TodaySummary(habits = habits) }
+                item {
+                    TodaySummary(
+                        total = habits.size,
+                        completed = completedIds.size
+                    )
+                }
                 items(habits, key = { it.id }) { habit ->
+                    val isCompleted = habit.id in completedIds
                     HabitCard(
                         habit = habit,
+                        doneToday = isCompleted,
                         onToggle = {
                             scope.launch {
-                                dao.update(habit.copy(doneToday = !habit.doneToday))
+                                if (isCompleted) {
+                                    completionDao.deleteForDate(habit.id, today)
+                                } else {
+                                    completionDao.insert(
+                                        HabitCompletionEntity(
+                                            habitId = habit.id,
+                                            date = today
+                                        )
+                                    )
+                                }
                             }
                         },
                         onDelete = {
-                            scope.launch { dao.delete(habit) }
+                            scope.launch {
+                                completionDao.deleteForHabit(habit.id)
+                                habitDao.delete(habit)
+                            }
                         }
                     )
                 }
@@ -151,7 +178,7 @@ private fun HabitHomeScreen() {
         AddHabitDialog(
             onDismiss = { showAddDialog = false },
             onAdd = { name ->
-                scope.launch { dao.insert(HabitEntity(name = name)) }
+                scope.launch { habitDao.insert(HabitEntity(name = name)) }
                 showAddDialog = false
             }
         )
@@ -159,8 +186,7 @@ private fun HabitHomeScreen() {
 }
 
 @Composable
-private fun TodaySummary(habits: List<HabitEntity>) {
-    val completed = habits.count { it.doneToday }
+private fun TodaySummary(total: Int, completed: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -176,7 +202,7 @@ private fun TodaySummary(habits: List<HabitEntity>) {
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "$completed of ${habits.size} habits completed",
+                text = "$completed of $total habits completed",
                 style = MaterialTheme.typography.bodyLarge
             )
         }
@@ -186,6 +212,7 @@ private fun TodaySummary(habits: List<HabitEntity>) {
 @Composable
 private fun HabitCard(
     habit: HabitEntity,
+    doneToday: Boolean,
     onToggle: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -202,7 +229,7 @@ private fun HabitCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BoxIndicator(done = habit.doneToday)
+            BoxIndicator(done = doneToday)
             Spacer(modifier = Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -211,12 +238,12 @@ private fun HabitCard(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = if (habit.doneToday) "Completed today" else "Not completed yet",
+                    text = if (doneToday) "Completed today" else "Not completed yet",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
             Checkbox(
-                checked = habit.doneToday,
+                checked = doneToday,
                 onCheckedChange = { onToggle() }
             )
             TextButton(onClick = { showDeleteDialog = true }) {
@@ -229,7 +256,7 @@ private fun HabitCard(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Delete habit?") },
-            text = { Text("\"${habit.name}\" will be removed from this list.") },
+            text = { Text("\"${habit.name}\" and its history will be removed.") },
             confirmButton = {
                 Button(onClick = {
                     showDeleteDialog = false
