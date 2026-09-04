@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.habittracker.data.HabitDatabase
 import com.example.habittracker.data.HabitEntity
 import com.example.habittracker.ui.theme.HabitTrackerTheme
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
