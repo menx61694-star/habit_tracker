@@ -51,8 +51,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.habittracker.data.HabitCompletionEntity
 import com.example.habittracker.data.HabitDatabase
 import com.example.habittracker.data.HabitEntity
+import com.example.habittracker.data.currentWeekDateRange
+import com.example.habittracker.data.formatDate
+import com.example.habittracker.data.isHabitScheduledToday
 import com.example.habittracker.ui.theme.HabitTrackerTheme
-import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.flow.first
@@ -147,8 +149,12 @@ private fun HabitHomeScreen() {
     val habitDao = database.habitDao()
     val completionDao = database.habitCompletionDao()
     val habits by habitDao.observeHabits().collectAsStateWithLifecycle(initialValue = emptyList())
-    val today = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) }
-    val completedIds by completionDao.observeCompletedHabitIds(today)
+    val todayDate = remember { Date() }
+    val today = remember { formatDate(todayDate) }
+    val (weekStart, weekEnd) = remember(today) { currentWeekDateRange(todayDate) }
+    val completedTodayIds by completionDao.observeCompletedHabitIds(today)
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+    val completedThisWeekIds by completionDao.observeCompletedHabitIdsBetween(weekStart, weekEnd)
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = rememberCoroutineScope()
     var showAddDialog by remember { mutableStateOf(false) }
@@ -162,6 +168,17 @@ private fun HabitHomeScreen() {
                 habitDao.insert(HabitEntity(name = "Walk 30 Minutes", icon = "🏃", category = "Fitness"))
             }
             preferences.edit().putBoolean("defaults_created", true).apply()
+        }
+    }
+
+    val scheduledHabits = habits.filter { habit ->
+        habit.frequency.equals("weekly", ignoreCase = true) || isHabitScheduledToday(habit.frequency, todayDate)
+    }
+    val completedScheduledCount = scheduledHabits.count { habit ->
+        if (habit.frequency.equals("weekly", ignoreCase = true)) {
+            habit.id in completedThisWeekIds
+        } else {
+            habit.id in completedTodayIds
         }
     }
 
@@ -195,15 +212,39 @@ private fun HabitHomeScreen() {
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item { TodaySummary(habits.size, completedIds.size) }
+                item { TodaySummary(scheduledHabits.size, completedScheduledCount) }
                 items(habits, key = { it.id }) { habit ->
-                    val isCompleted = habit.id in completedIds
+                    val isWeekly = habit.frequency.equals("weekly", ignoreCase = true)
+                    val isScheduledToday = isHabitScheduledToday(habit.frequency, todayDate)
+                    val isCompleted = if (isWeekly) {
+                        habit.id in completedThisWeekIds
+                    } else {
+                        habit.id in completedTodayIds
+                    }
+                    val canToggle = isWeekly || isScheduledToday
+                    val statusText = when {
+                        isWeekly && isCompleted -> "Completed this week"
+                        isWeekly -> "Not completed this week"
+                        !isScheduledToday -> "Rest day"
+                        isCompleted -> "Completed today"
+                        else -> "Not completed yet"
+                    }
                     HabitCard(
                         habit = habit,
                         doneToday = isCompleted,
+                        enabled = canToggle,
+                        statusText = statusText,
                         onToggle = {
                             scope.launch {
-                                if (isCompleted) {
+                                if (isWeekly) {
+                                    if (isCompleted) {
+                                        completionDao.getLatestCompletionDate(habit.id, weekStart, weekEnd)?.let { date ->
+                                            completionDao.deleteForDate(habit.id, date)
+                                        }
+                                    } else {
+                                        completionDao.insert(HabitCompletionEntity(habit.id, today))
+                                    }
+                                } else if (isCompleted) {
                                     completionDao.deleteForDate(habit.id, today)
                                 } else {
                                     completionDao.insert(HabitCompletionEntity(habit.id, today))
@@ -276,7 +317,7 @@ private fun TodaySummary(total: Int, completed: Int) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text("Today", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(6.dp))
-            Text("$completed of $total habits completed", style = MaterialTheme.typography.bodyLarge)
+            Text("$completed of $total scheduled habits completed", style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
@@ -285,6 +326,8 @@ private fun TodaySummary(total: Int, completed: Int) {
 private fun HabitCard(
     habit: HabitEntity,
     doneToday: Boolean,
+    enabled: Boolean,
+    statusText: String,
     onToggle: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -317,12 +360,15 @@ private fun HabitCard(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "${habit.category} • ${habit.frequency} • " +
-                        if (doneToday) "Completed today" else "Not completed yet",
+                    text = "${habit.category} • ${habit.frequency} • $statusText",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            Checkbox(checked = doneToday, onCheckedChange = { onToggle() })
+            Checkbox(
+                checked = doneToday,
+                onCheckedChange = { onToggle() },
+                enabled = enabled
+            )
             TextButton(onClick = onEdit) { Text("Edit") }
             TextButton(onClick = { showDeleteDialog = true }) { Text("Delete") }
         }
