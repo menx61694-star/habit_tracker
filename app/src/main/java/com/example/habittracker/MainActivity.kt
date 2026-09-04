@@ -35,11 +35,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,19 +57,41 @@ import kotlinx.coroutines.launch
 
 private enum class AppTab {
     Home,
-    History
+    History,
+    Settings
 }
+
+private const val PREFS_NAME = "habit_tracker"
+private const val THEME_KEY = "theme_mode"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            HabitTrackerTheme {
+            val preferences = remember {
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            }
+            var themeMode by remember {
+                mutableStateOf(AppThemeMode.fromStorage(preferences.getString(THEME_KEY, null)))
+            }
+            val darkTheme = when (themeMode) {
+                AppThemeMode.System -> androidx.compose.foundation.isSystemInDarkTheme()
+                AppThemeMode.Light -> false
+                AppThemeMode.Dark -> true
+            }
+
+            HabitTrackerTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    HabitApp()
+                    HabitApp(
+                        themeMode = themeMode,
+                        onThemeModeChanged = { newMode ->
+                            themeMode = newMode
+                            preferences.edit().putString(THEME_KEY, newMode.storageValue).apply()
+                        }
+                    )
                 }
             }
         }
@@ -79,7 +99,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun HabitApp() {
+private fun HabitApp(
+    themeMode: AppThemeMode,
+    onThemeModeChanged: (AppThemeMode) -> Unit
+) {
     var selectedTab by remember { mutableStateOf(AppTab.Home) }
 
     Scaffold(
@@ -97,6 +120,12 @@ private fun HabitApp() {
                     icon = { Text("▦") },
                     label = { Text("History") }
                 )
+                NavigationBarItem(
+                    selected = selectedTab == AppTab.Settings,
+                    onClick = { selectedTab = AppTab.Settings },
+                    icon = { Text("⚙") },
+                    label = { Text("Settings") }
+                )
             }
         }
     ) { innerPadding ->
@@ -108,6 +137,10 @@ private fun HabitApp() {
             when (selectedTab) {
                 AppTab.Home -> HabitHomeScreen()
                 AppTab.History -> HistoryScreen()
+                AppTab.Settings -> SettingsScreen(
+                    themeMode = themeMode,
+                    onThemeModeChanged = onThemeModeChanged
+                )
             }
         }
     }
@@ -126,8 +159,8 @@ private fun HabitHomeScreen() {
     val scope = rememberCoroutineScope()
     var showAddDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        val preferences = context.getSharedPreferences("habit_tracker", 0)
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val preferences = context.getSharedPreferences(PREFS_NAME, 0)
         if (!preferences.getBoolean("defaults_created", false)) {
             if (habitDao.observeHabits().first().isEmpty()) {
                 habitDao.insert(HabitEntity(name = "Drink Water"))
