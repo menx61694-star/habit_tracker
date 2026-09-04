@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
 private const val PREFS_NAME = "habit_tracker"
 private const val THEME_KEY = "theme_mode"
 
-internal enum class AppThemeMode(val storageValue: String, val label: String) {
+enum class AppThemeMode(val storageValue: String, val label: String) {
     System("system", "System"),
     Light("light", "Light"),
     Dark("dark", "Dark");
