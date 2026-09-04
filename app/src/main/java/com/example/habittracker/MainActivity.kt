@@ -56,22 +56,21 @@ import java.util.Locale
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-private enum class AppTab {
-    Home,
-    History,
-    Settings
-}
+private enum class AppTab { Home, History, Settings }
 
 private const val PREFS_NAME = "habit_tracker"
 private const val THEME_KEY = "theme_mode"
+
+private val habitIcons = listOf("✓", "💧", "🏃", "📚", "🧘", "💪", "🥗", "💤")
+private val habitCategories = listOf("General", "Health", "Fitness", "Study", "Mind")
+private val habitColors = listOf("green", "blue", "orange", "purple")
+private val habitFrequencies = listOf("Daily", "Weekdays", "Weekly")
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            val preferences = remember {
-                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            }
+            val preferences = remember { getSharedPreferences(PREFS_NAME, MODE_PRIVATE) }
             var themeMode by remember {
                 mutableStateOf(AppThemeMode.fromStorage(preferences.getString(THEME_KEY, null)))
             }
@@ -80,7 +79,6 @@ class MainActivity : ComponentActivity() {
                 AppThemeMode.Light -> false
                 AppThemeMode.Dark -> true
             }
-
             HabitTrackerTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -130,18 +128,11 @@ private fun HabitApp(
             }
         }
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             when (selectedTab) {
                 AppTab.Home -> HabitHomeScreen()
                 AppTab.History -> HistoryScreen()
-                AppTab.Settings -> SettingsScreen(
-                    themeMode = themeMode,
-                    onThemeModeChanged = onThemeModeChanged
-                )
+                AppTab.Settings -> SettingsScreen(themeMode, onThemeModeChanged)
             }
         }
     }
@@ -159,13 +150,14 @@ private fun HabitHomeScreen() {
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = rememberCoroutineScope()
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingHabit by remember { mutableStateOf<HabitEntity?>(null) }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         val preferences = context.getSharedPreferences(PREFS_NAME, 0)
         if (!preferences.getBoolean("defaults_created", false)) {
             if (habitDao.observeHabits().first().isEmpty()) {
-                habitDao.insert(HabitEntity(name = "Drink Water"))
-                habitDao.insert(HabitEntity(name = "Walk 30 Minutes"))
+                habitDao.insert(HabitEntity(name = "Drink Water", icon = "💧", category = "Health"))
+                habitDao.insert(HabitEntity(name = "Walk 30 Minutes", icon = "🏃", category = "Fitness"))
             }
             preferences.edit().putBoolean("defaults_created", true).apply()
         }
@@ -174,16 +166,11 @@ private fun HabitHomeScreen() {
     Scaffold(
         topBar = {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 18.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp)
             ) {
+                Text("Good day 👋", style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = "Good day 👋",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = "Your habits",
+                    "Your habits",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -191,34 +178,22 @@ private fun HabitHomeScreen() {
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
-                Text(text = "+", style = MaterialTheme.typography.headlineSmall)
+                Text("+", style = MaterialTheme.typography.headlineSmall)
             }
         }
     ) { innerPadding ->
         if (habits.isEmpty()) {
             EmptyHabits(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) { showAddDialog = true }
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                onAdd = { showAddDialog = true }
+            )
         } else {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    bottom = 96.dp
-                ),
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item {
-                    TodaySummary(
-                        total = habits.size,
-                        completed = completedIds.size
-                    )
-                }
+                item { TodaySummary(habits.size, completedIds.size) }
                 items(habits, key = { it.id }) { habit ->
                     val isCompleted = habit.id in completedIds
                     HabitCard(
@@ -229,15 +204,11 @@ private fun HabitHomeScreen() {
                                 if (isCompleted) {
                                     completionDao.deleteForDate(habit.id, today)
                                 } else {
-                                    completionDao.insert(
-                                        HabitCompletionEntity(
-                                            habitId = habit.id,
-                                            date = today
-                                        )
-                                    )
+                                    completionDao.insert(HabitCompletionEntity(habit.id, today))
                                 }
                             }
                         },
+                        onEdit = { editingHabit = habit },
                         onDelete = {
                             scope.launch {
                                 completionDao.deleteForHabit(habit.id)
@@ -251,11 +222,43 @@ private fun HabitHomeScreen() {
     }
 
     if (showAddDialog) {
-        AddHabitDialog(
+        HabitFormDialog(
+            existingHabit = null,
             onDismiss = { showAddDialog = false },
-            onAdd = { name ->
-                scope.launch { habitDao.insert(HabitEntity(name = name)) }
+            onSave = { name, icon, category, color, frequency ->
+                scope.launch {
+                    habitDao.insert(
+                        HabitEntity(
+                            name = name,
+                            icon = icon,
+                            category = category,
+                            color = color,
+                            frequency = frequency
+                        )
+                    )
+                }
                 showAddDialog = false
+            }
+        )
+    }
+
+    editingHabit?.let { habit ->
+        HabitFormDialog(
+            existingHabit = habit,
+            onDismiss = { editingHabit = null },
+            onSave = { name, icon, category, color, frequency ->
+                scope.launch {
+                    habitDao.update(
+                        habit.copy(
+                            name = name,
+                            icon = icon,
+                            category = category,
+                            color = color,
+                            frequency = frequency
+                        )
+                    )
+                }
+                editingHabit = null
             }
         )
     }
@@ -266,21 +269,12 @@ private fun TodaySummary(total: Int, completed: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = "Today",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
+            Text("Today", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "$completed of $total habits completed",
-                style = MaterialTheme.typography.bodyLarge
-            )
+            Text("$completed of $total habits completed", style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
@@ -290,6 +284,7 @@ private fun HabitCard(
     habit: HabitEntity,
     doneToday: Boolean,
     onToggle: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -300,31 +295,26 @@ private fun HabitCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BoxIndicator(done = doneToday)
+            BoxIndicator(doneToday)
             Spacer(modifier = Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = habit.name,
+                    text = "${habit.icon} ${habit.name}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = if (doneToday) "Completed today" else "Not completed yet",
+                    text = "${habit.category} • ${habit.frequency} • " +
+                        if (doneToday) "Completed today" else "Not completed yet",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            Checkbox(
-                checked = doneToday,
-                onCheckedChange = { onToggle() }
-            )
-            TextButton(onClick = { showDeleteDialog = true }) {
-                Text("Delete")
-            }
+            Checkbox(checked = doneToday, onCheckedChange = { onToggle() })
+            TextButton(onClick = onEdit) { Text("Edit") }
+            TextButton(onClick = { showDeleteDialog = true }) { Text("Delete") }
         }
     }
 
@@ -340,9 +330,7 @@ private fun HabitCard(
                 }) { Text("Delete") }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
-                }
+                OutlinedButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
             }
         )
     }
@@ -350,17 +338,8 @@ private fun HabitCard(
 
 @Composable
 private fun BoxIndicator(done: Boolean) {
-    val color = if (done) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    Box(
-        modifier = Modifier
-            .size(12.dp)
-            .clip(CircleShape)
-            .background(color)
-    )
+    val color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(color))
 }
 
 @Composable
@@ -370,55 +349,90 @@ private fun EmptyHabits(modifier: Modifier = Modifier, onAdd: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "No habits yet",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
+        Text("No habits yet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Add your first habit and start building your routine.",
-            style = MaterialTheme.typography.bodyMedium
-        )
+        Text("Add your first habit and start building your routine.", style = MaterialTheme.typography.bodyMedium)
         Spacer(modifier = Modifier.height(20.dp))
-        Button(onClick = onAdd) {
-            Text("Add Habit")
-        }
+        Button(onClick = onAdd) { Text("Add Habit") }
     }
 }
 
 @Composable
-private fun AddHabitDialog(
+private fun HabitFormDialog(
+    existingHabit: HabitEntity?,
     onDismiss: () -> Unit,
-    onAdd: (String) -> Unit
+    onSave: (String, String, String, String, String) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(existingHabit?.name.orEmpty()) }
+    var icon by remember { mutableStateOf(existingHabit?.icon ?: habitIcons.first()) }
+    var category by remember { mutableStateOf(existingHabit?.category ?: habitCategories.first()) }
+    var color by remember { mutableStateOf(existingHabit?.color ?: habitColors.first()) }
+    var frequency by remember { mutableStateOf(existingHabit?.frequency ?: habitFrequencies.first()) }
     val trimmedName = name.trim()
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Habit") },
+        title = { Text(if (existingHabit == null) "Add Habit" else "Edit Habit") },
         text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Habit name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Habit name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text("Icon", style = MaterialTheme.typography.labelLarge)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    habitIcons.take(4).forEach { option ->
+                        ChoiceButton(option, option == icon) { icon = option }
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    habitIcons.drop(4).forEach { option ->
+                        ChoiceButton(option, option == icon) { icon = option }
+                    }
+                }
+                Text("Category", style = MaterialTheme.typography.labelLarge)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    habitCategories.take(3).forEach { option ->
+                        ChoiceButton(option, option == category) { category = option }
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    habitCategories.drop(3).forEach { option ->
+                        ChoiceButton(option, option == category) { category = option }
+                    }
+                }
+                Text("Color", style = MaterialTheme.typography.labelLarge)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    habitColors.forEach { option ->
+                        ChoiceButton(option.replaceFirstChar { it.uppercase() }, option == color) { color = option }
+                    }
+                }
+                Text("Frequency", style = MaterialTheme.typography.labelLarge)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    habitFrequencies.forEach { option ->
+                        ChoiceButton(option, option == frequency) { frequency = option }
+                    }
+                }
+            }
         },
         confirmButton = {
             Button(
-                onClick = { onAdd(trimmedName) },
+                onClick = { onSave(trimmedName, icon, category, color, frequency) },
                 enabled = trimmedName.isNotEmpty()
-            ) {
-                Text("Add")
-            }
+            ) { Text(if (existingHabit == null) "Add" else "Save") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+}
+
+@Composable
+private fun ChoiceButton(label: String, selected: Boolean, onClick: () -> Unit) {
+    if (selected) {
+        Button(onClick = onClick, modifier = Modifier.weight(1f)) { Text(label) }
+    } else {
+        OutlinedButton(onClick = onClick, modifier = Modifier.weight(1f)) { Text(label) }
+    }
 }
