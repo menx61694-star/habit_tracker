@@ -31,6 +31,10 @@ abstract class HabitDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_habit_completions_date " +
+                        "ON habit_completions(date)"
+                )
 
                 val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
                 db.execSQL(
