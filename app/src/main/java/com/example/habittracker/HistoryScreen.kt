@@ -49,6 +49,7 @@ import com.example.habittracker.data.formatStatsDate
 import com.example.habittracker.data.monthCalendar
 import com.example.habittracker.data.monthEnd
 import com.example.habittracker.data.monthStart
+import com.example.habittracker.data.scheduledDatesInRange
 import com.example.habittracker.data.yearEnd
 import com.example.habittracker.data.yearStart
 import java.text.SimpleDateFormat
@@ -493,7 +494,7 @@ private fun completedOpportunityCountForRange(
     end: Calendar,
     completedDates: List<String>
 ): Int {
-    val scheduled = scheduledOpportunityCount(habit.frequency, start, end).toSet()
+    val scheduled = scheduledDatesInRange(habit.frequency, start, end).toSet()
     if (scheduled.isEmpty()) return 0
     return if (habit.frequency.equals("weekly", ignoreCase = true)) {
         completedDates.mapNotNull { parseStatsDate(it) }
@@ -541,5 +542,5 @@ private fun statsWeekStart(date: Calendar): String {
     val monday = date.clone() as Calendar
     monday.firstDayOfWeek = Calendar.MONDAY
     monday.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-    return formatStatsDate(monday)
+    return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(monday.time)
 }
