@@ -5,10 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -159,7 +159,7 @@ private fun HistoryModeButton(
 }
 
 @Composable
-private fun ColumnScope.MonthHistory(
+private fun MonthHistory(
     database: HabitDatabase,
     habit: HabitEntity,
     monthOffset: Int,
@@ -183,28 +183,20 @@ private fun ColumnScope.MonthHistory(
     val bestStreak = bestStreakForRange(habit.frequency, start, end, completedDates)
     val completedCount = completedOpportunityCountForMonth(habit, start, end, completedDates)
 
-    MonthHeader(
-        monthOffset = monthOffset,
-        onPrevious = onPrevious,
-        onNext = onNext
-    )
-
+    MonthHeader(monthOffset = monthOffset, onPrevious = onPrevious, onNext = onNext)
     CalendarLegend()
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(7),
         modifier = Modifier
             .fillMaxWidth()
-            .weight(1f),
+            .fillMaxHeight(0.5f),
         contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         items(monthData, key = { it.key }) { day ->
-            CalendarDay(
-                day = day,
-                completed = day.date in visibleCompletedDates
-            )
+            CalendarDay(day = day, completed = day.date in visibleCompletedDates)
         }
     }
 
@@ -217,7 +209,7 @@ private fun ColumnScope.MonthHistory(
 }
 
 @Composable
-private fun ColumnScope.YearHistory(
+private fun YearHistory(
     database: HabitDatabase,
     habit: HabitEntity,
     yearOffset: Int,
@@ -270,7 +262,7 @@ private fun ColumnScope.YearHistory(
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
-            .weight(1f),
+            .fillMaxHeight(0.5f),
         contentPadding = PaddingValues(bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -381,10 +373,7 @@ private fun buildMonthData(month: Calendar): List<CalendarDayData> {
     val maxDay = month.getActualMaximum(Calendar.DAY_OF_MONTH)
     val today = Calendar.getInstance()
     val result = mutableListOf<CalendarDayData>()
-
-    repeat(leadingDays) { index ->
-        result += CalendarDayData("empty-$index", "", null, false)
-    }
+    repeat(leadingDays) { index -> result += CalendarDayData("empty-$index", "", null, false) }
     for (day in 1..maxDay) {
         val date = (month.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, day) }
         result += CalendarDayData(
