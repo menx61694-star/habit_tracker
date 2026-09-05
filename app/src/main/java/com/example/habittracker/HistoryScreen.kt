@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -158,7 +159,7 @@ private fun HistoryModeButton(
 }
 
 @Composable
-private fun MonthHistory(
+private fun ColumnScope.MonthHistory(
     database: HabitDatabase,
     habit: HabitEntity,
     monthOffset: Int,
@@ -216,7 +217,7 @@ private fun MonthHistory(
 }
 
 @Composable
-private fun YearHistory(
+private fun ColumnScope.YearHistory(
     database: HabitDatabase,
     habit: HabitEntity,
     yearOffset: Int,
@@ -494,7 +495,7 @@ private fun completedOpportunityCountForRange(
     end: Calendar,
     completedDates: List<String>
 ): Int {
-    val scheduled = scheduledDatesInRange(habit.frequency, start, end).toSet()
+    val scheduled = scheduledDatesInRange(habit.frequency, start, end)
     if (scheduled.isEmpty()) return 0
     return if (habit.frequency.equals("weekly", ignoreCase = true)) {
         completedDates.mapNotNull { parseStatsDate(it) }
