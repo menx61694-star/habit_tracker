@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.habittracker.data.FirebaseCloudBackup
 import com.example.habittracker.data.HabitDatabase
 import com.example.habittracker.data.exportHabitBackup
 import com.example.habittracker.data.restoreHabitBackup
@@ -71,9 +72,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val database = remember { HabitDatabase.getInstance(context) }
-    val preferences = remember {
-        context.getSharedPreferences(PREFS_NAME, 0)
-    }
+    val preferences = remember { context.getSharedPreferences(PREFS_NAME, 0) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var showResetDialog by remember { mutableStateOf(false) }
@@ -85,9 +84,7 @@ fun SettingsScreen(
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             try {
-                val backup = withContext(Dispatchers.IO) {
-                    exportHabitBackup(database, preferences)
-                }
+                val backup = withContext(Dispatchers.IO) { exportHabitBackup(database, preferences) }
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { output ->
                         output.writer(Charsets.UTF_8).use { writer -> writer.write(backup) }
@@ -95,9 +92,7 @@ fun SettingsScreen(
                 }
                 snackbarHostState.showSnackbar("Backup exported successfully")
             } catch (error: Exception) {
-                snackbarHostState.showSnackbar(
-                    error.message ?: "Backup export failed"
-                )
+                snackbarHostState.showSnackbar(error.message ?: "Backup export failed")
             }
         }
     }
@@ -113,76 +108,39 @@ fun SettingsScreen(
                         input.reader(Charsets.UTF_8).readText()
                     } ?: error("Could not read the selected file")
                 }
-                val result = withContext(Dispatchers.IO) {
-                    restoreHabitBackup(database, preferences, backup)
-                }
+                val result = withContext(Dispatchers.IO) { restoreHabitBackup(database, preferences, backup) }
                 result.themeMode?.let { onThemeModeChanged(AppThemeMode.fromStorage(it)) }
-                snackbarHostState.showSnackbar(
-                    "Restored ${result.habitCount} habits and ${result.completionCount} completions"
-                )
+                snackbarHostState.showSnackbar("Restored ${result.habitCount} habits and ${result.completionCount} completions")
             } catch (error: Exception) {
-                snackbarHostState.showSnackbar(
-                    error.message ?: "Backup restore failed"
-                )
+                snackbarHostState.showSnackbar(error.message ?: "Backup restore failed")
             }
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { padding ->
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
+            modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Personalize the app, back up your habits, and manage your data.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Text("Personalize the app, back up your habits, and manage your data.", style = MaterialTheme.typography.bodyMedium)
             }
 
             item {
                 SettingsCard(title = "Appearance") {
-                    Text(
-                        text = "Theme",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Text("Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Choose how Habit Tracker looks.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Text("Choose how Habit Tracker looks.", style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppThemeMode.entries.forEach { option ->
                             if (option == themeMode) {
-                                Button(
-                                    onClick = { onThemeModeChanged(option) },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(option.label)
-                                }
+                                Button(onClick = { onThemeModeChanged(option) }, modifier = Modifier.weight(1f)) { Text(option.label) }
                             } else {
-                                OutlinedButton(
-                                    onClick = { onThemeModeChanged(option) },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(option.label)
-                                }
+                                OutlinedButton(onClick = { onThemeModeChanged(option) }, modifier = Modifier.weight(1f)) { Text(option.label) }
                             }
                         }
                     }
@@ -191,41 +149,35 @@ fun SettingsScreen(
 
             item {
                 SettingsCard(title = "Backup & restore") {
-                    Text(
-                        text = "Save your habits and completion history as a JSON backup, then restore it on this or another device.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Text("Save your habits and completion history as a JSON backup, then restore it on this or another device.", style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = {
-                                val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US)
-                                    .format(Date())
+                                val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
                                 exportLauncher.launch("HabitTracker-backup-$stamp.json")
                             },
                             modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Export")
-                        }
+                        ) { Text("Export") }
                         OutlinedButton(
                             onClick = { importLauncher.launch(arrayOf("application/json", "text/plain")) },
                             modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Import")
-                        }
+                        ) { Text("Import") }
                     }
                 }
             }
 
             item {
+                CloudBackupCard(
+                    database = database,
+                    preferences = preferences,
+                    snackbarHostState = snackbarHostState
+                )
+            }
+
+            item {
                 SettingsCard(title = "Feedback") {
-                    Text(
-                        text = "Tell us what should be improved or what is working well.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Text("Tell us what should be improved or what is working well.", style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = feedback,
@@ -237,10 +189,7 @@ fun SettingsScreen(
                         placeholder = { Text("Write your suggestion or report a problem…") }
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = {
                                 val message = feedback.trim()
@@ -251,70 +200,43 @@ fun SettingsScreen(
                                             putExtra(Intent.EXTRA_SUBJECT, FEEDBACK_SUBJECT)
                                             putExtra(Intent.EXTRA_TEXT, message)
                                         }
-                                        context.startActivity(
-                                            Intent.createChooser(shareIntent, "Send feedback with")
-                                        )
+                                        context.startActivity(Intent.createChooser(shareIntent, "Send feedback with"))
                                     } catch (_: ActivityNotFoundException) {
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("No app is available to send feedback")
-                                        }
+                                        scope.launch { snackbarHostState.showSnackbar("No app is available to send feedback") }
                                     }
                                 }
                             },
                             enabled = feedback.isNotBlank(),
                             modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Share feedback")
-                        }
+                        ) { Text("Share feedback") }
                         OutlinedButton(
                             onClick = {
                                 try {
-                                    context.startActivity(
-                                        Intent(Intent.ACTION_VIEW, Uri.parse(ISSUE_URL))
-                                    )
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ISSUE_URL)))
                                 } catch (_: ActivityNotFoundException) {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("Could not open issue tracker")
-                                    }
+                                    scope.launch { snackbarHostState.showSnackbar("Could not open issue tracker") }
                                 }
                             },
                             modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Report issue")
-                        }
+                        ) { Text("Report issue") }
                     }
                 }
             }
 
             item {
                 SettingsCard(title = "Data") {
-                    Text(
-                        text = "Reset all habits and completion history.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Text("Reset all habits and completion history.", style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedButton(onClick = { showResetDialog = true }) {
-                        Text("Reset all data")
-                    }
+                    OutlinedButton(onClick = { showResetDialog = true }) { Text("Reset all data") }
                 }
             }
 
             item {
                 SettingsCard(title = "About") {
-                    Text(
-                        text = "Habit Tracker",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "Build habits. Track progress. Stay consistent.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Text("Habit Tracker", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Build habits. Track progress. Stay consistent.", style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Version ${BuildConfig.VERSION_NAME}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -324,31 +246,120 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
             title = { Text("Reset all data?") },
-            text = {
-                Text("This will permanently delete every habit and its completion history. This cannot be undone.")
-            },
+            text = { Text("This will permanently delete every habit and its completion history. This cannot be undone.") },
             confirmButton = {
+                Button(onClick = {
+                    showResetDialog = false
+                    scope.launch(Dispatchers.IO) {
+                        database.habitCompletionDao().deleteAll()
+                        database.habitDao().deleteAll()
+                        preferences.edit().putBoolean(DEFAULTS_CREATED_KEY, false).apply()
+                    }
+                }) { Text("Reset") }
+            },
+            dismissButton = { TextButton(onClick = { showResetDialog = false }) { Text("Cancel") } }
+        )
+    }
+}
+
+@Composable
+private fun CloudBackupCard(
+    database: HabitDatabase,
+    preferences: android.content.SharedPreferences,
+    snackbarHostState: SnackbarHostState
+) {
+    val scope = rememberCoroutineScope()
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var registerMode by rememberSaveable { mutableStateOf(false) }
+    var signedIn by remember { mutableStateOf(FirebaseCloudBackup.currentUser != null) }
+
+    SettingsCard(title = "Cloud backup") {
+        if (signedIn) {
+            Text(
+                "Signed in as ${FirebaseCloudBackup.currentUser?.email ?: "your account"}. Your latest local backup can be synced securely to Firestore.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
-                        showResetDialog = false
-                        scope.launch(Dispatchers.IO) {
-                            database.habitCompletionDao().deleteAll()
-                            database.habitDao().deleteAll()
-                            preferences.edit()
-                                .putBoolean(DEFAULTS_CREATED_KEY, false)
-                                .apply()
+                        scope.launch {
+                            try {
+                                val backup = withContext(Dispatchers.IO) { exportHabitBackup(database, preferences) }
+                                withContext(Dispatchers.IO) { FirebaseCloudBackup.uploadBackup(backup) }
+                                snackbarHostState.showSnackbar("Cloud backup uploaded")
+                            } catch (error: Exception) {
+                                snackbarHostState.showSnackbar(error.message ?: "Cloud upload failed")
+                            }
                         }
-                    }
-                ) {
-                    Text("Reset")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) {
-                    Text("Cancel")
-                }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Upload") }
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val backup = withContext(Dispatchers.IO) { FirebaseCloudBackup.downloadBackup() }
+                                val result = withContext(Dispatchers.IO) { restoreHabitBackup(database, preferences, backup) }
+                                snackbarHostState.showSnackbar("Restored ${result.habitCount} habits and ${result.completionCount} completions")
+                            } catch (error: Exception) {
+                                snackbarHostState.showSnackbar(error.message ?: "Cloud restore failed")
+                            }
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Download") }
             }
-        )
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(onClick = {
+                FirebaseCloudBackup.signOut()
+                signedIn = false
+            }) { Text("Sign out") }
+        } else {
+            Text(
+                "Use an account to keep one encrypted-style JSON backup in your Firebase project and restore it on another device.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Email") }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Password") }
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                if (registerMode) FirebaseCloudBackup.register(email, password)
+                                else FirebaseCloudBackup.signIn(email, password)
+                                signedIn = true
+                                snackbarHostState.showSnackbar(if (registerMode) "Account created" else "Signed in")
+                            } catch (error: Exception) {
+                                snackbarHostState.showSnackbar(error.message ?: "Authentication failed")
+                            }
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text(if (registerMode) "Create account" else "Sign in") }
+                OutlinedButton(
+                    onClick = { registerMode = !registerMode },
+                    modifier = Modifier.weight(1f)
+                ) { Text(if (registerMode) "Use sign in" else "Create account") }
+            }
+        }
     }
 }
 
@@ -359,16 +370,10 @@ private fun SettingsCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))
             content()
         }
