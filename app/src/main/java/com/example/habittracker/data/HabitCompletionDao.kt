@@ -54,8 +54,14 @@ interface HabitCompletionDao {
         endDate: String
     ): String?
 
+    @Query("SELECT * FROM habit_completions ORDER BY habitId ASC, date ASC")
+    suspend fun getAll(): List<HabitCompletionEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(completion: HabitCompletionEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(completions: List<HabitCompletionEntity>)
 
     @Query("DELETE FROM habit_completions WHERE habitId = :habitId AND date = :date")
     suspend fun deleteForDate(habitId: Int, date: String)
