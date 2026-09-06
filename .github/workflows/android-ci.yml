@@ -29,6 +29,30 @@ jobs:
       - name: Install Android SDK 36
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
+      - name: Configure Firebase
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GOOGLE_SERVICES_JSON:-}" ]; then
+            echo "GOOGLE_SERVICES_JSON secret is not configured."
+            echo "Add the Firebase google-services.json content as the repository secret GOOGLE_SERVICES_JSON."
+            exit 1
+          fi
+
+          mkdir -p app
+
+          if printf '%s' "$GOOGLE_SERVICES_JSON" | python3 -m json.tool >/dev/null 2>&1; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          else
+            printf '%s' "$GOOGLE_SERVICES_JSON" | base64 --decode > app/google-services.json
+          fi
+
+          python3 -m json.tool app/google-services.json >/dev/null
+          echo "Firebase configuration validated."
+
       - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
