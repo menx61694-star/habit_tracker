@@ -37,6 +37,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.example.habittracker.data.FirebaseCloudBackup
 import com.example.habittracker.data.HabitDatabase
@@ -273,52 +276,82 @@ private fun CloudBackupCard(
     var password by rememberSaveable { mutableStateOf("") }
     var registerMode by rememberSaveable { mutableStateOf(false) }
     var signedIn by remember { mutableStateOf(FirebaseCloudBackup.currentUser != null) }
+    var busy by remember { mutableStateOf(false) }
+
+    fun friendlyFirebaseError(error: Exception, fallback: String): String {
+        val message = error.message.orEmpty()
+        return when {
+            message.contains("password", ignoreCase = true) -> "Password must be at least 6 characters."
+            message.contains("badly formatted", ignoreCase = true) || message.contains("invalid email", ignoreCase = true) -> "Enter a valid email address."
+            message.contains("already in use", ignoreCase = true) -> "An account already exists with this email. Try signing in."
+            message.contains("no user record", ignoreCase = true) || message.contains("user-not-found", ignoreCase = true) -> "No account was found for this email."
+            message.contains("wrong-password", ignoreCase = true) || message.contains("invalid-credential", ignoreCase = true) -> "Email or password is incorrect."
+            message.contains("network", ignoreCase = true) -> "Network error. Check your internet connection and try again."
+            else -> message.ifBlank { fallback }
+        }
+    }
 
     SettingsCard(title = "Cloud backup") {
         if (signedIn) {
             Text(
-                "Signed in as ${FirebaseCloudBackup.currentUser?.email ?: "your account"}. Your latest local backup can be synced securely to Firestore.",
+                "Signed in as ${FirebaseCloudBackup.currentUser?.email ?: "your account"}. Your latest local backup is stored securely in your Firebase project.",
                 style = MaterialTheme.typography.bodyMedium
             )
             Spacer(modifier = Modifier.height(10.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
+                        if (busy) return@Button
                         scope.launch {
+                            busy = true
                             try {
                                 val backup = withContext(Dispatchers.IO) { exportHabitBackup(database, preferences) }
                                 withContext(Dispatchers.IO) { FirebaseCloudBackup.uploadBackup(backup) }
                                 snackbarHostState.showSnackbar("Cloud backup uploaded")
                             } catch (error: Exception) {
-                                snackbarHostState.showSnackbar(error.message ?: "Cloud upload failed")
+                                snackbarHostState.showSnackbar(friendlyFirebaseError(error, "Cloud upload failed"))
+                            } finally {
+                                busy = false
                             }
                         }
                     },
+                    enabled = !busy,
                     modifier = Modifier.weight(1f)
-                ) { Text("Upload") }
+                ) { Text(if (busy) "Working…" else "Upload") }
                 OutlinedButton(
                     onClick = {
+                        if (busy) return@OutlinedButton
                         scope.launch {
+                            busy = true
                             try {
                                 val backup = withContext(Dispatchers.IO) { FirebaseCloudBackup.downloadBackup() }
                                 val result = withContext(Dispatchers.IO) { restoreHabitBackup(database, preferences, backup) }
                                 snackbarHostState.showSnackbar("Restored ${result.habitCount} habits and ${result.completionCount} completions")
                             } catch (error: Exception) {
-                                snackbarHostState.showSnackbar(error.message ?: "Cloud restore failed")
+                                snackbarHostState.showSnackbar(friendlyFirebaseError(error, "Cloud restore failed"))
+                            } finally {
+                                busy = false
                             }
                         }
                     },
+                    enabled = !busy,
                     modifier = Modifier.weight(1f)
-                ) { Text("Download") }
+                ) { Text(if (busy) "Working…" else "Download") }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            TextButton(onClick = {
-                FirebaseCloudBackup.signOut()
-                signedIn = false
-            }) { Text("Sign out") }
+            TextButton(
+                onClick = {
+                    if (!busy) {
+                        FirebaseCloudBackup.signOut()
+                        signedIn = false
+                        password = ""
+                    }
+                },
+                enabled = !busy
+            ) { Text("Sign out") }
         } else {
             Text(
-                "Use an account to keep one encrypted-style JSON backup in your Firebase project and restore it on another device.",
+                "Create an account or sign in to keep one JSON backup in your Firebase project and restore it on another device.",
                 style = MaterialTheme.typography.bodyMedium
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -327,6 +360,8 @@ private fun CloudBackupCard(
                 onValueChange = { email = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                enabled = !busy,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 label = { Text("Email") }
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -335,27 +370,37 @@ private fun CloudBackupCard(
                 onValueChange = { password = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                enabled = !busy,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 label = { Text("Password") }
             )
             Spacer(modifier = Modifier.height(10.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
+                        if (busy) return@Button
                         scope.launch {
+                            busy = true
                             try {
                                 if (registerMode) FirebaseCloudBackup.register(email, password)
                                 else FirebaseCloudBackup.signIn(email, password)
                                 signedIn = true
+                                password = ""
                                 snackbarHostState.showSnackbar(if (registerMode) "Account created" else "Signed in")
                             } catch (error: Exception) {
-                                snackbarHostState.showSnackbar(error.message ?: "Authentication failed")
+                                snackbarHostState.showSnackbar(friendlyFirebaseError(error, "Authentication failed"))
+                            } finally {
+                                busy = false
                             }
                         }
                     },
+                    enabled = !busy,
                     modifier = Modifier.weight(1f)
-                ) { Text(if (registerMode) "Create account" else "Sign in") }
+                ) { Text(if (busy) "Working…" else if (registerMode) "Create account" else "Sign in") }
                 OutlinedButton(
-                    onClick = { registerMode = !registerMode },
+                    onClick = { if (!busy) registerMode = !registerMode },
+                    enabled = !busy,
                     modifier = Modifier.weight(1f)
                 ) { Text(if (registerMode) "Use sign in" else "Create account") }
             }
