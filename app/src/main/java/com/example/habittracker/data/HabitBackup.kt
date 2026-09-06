@@ -14,8 +14,9 @@ suspend fun exportHabitBackup(
     database: HabitDatabase,
     preferences: SharedPreferences
 ): String {
-    val habits = database.habitDao().getAll()
-    val completions = database.habitCompletionDao().getAll()
+    val (habits, completions) = database.withTransaction {
+        database.habitDao().getAll() to database.habitCompletionDao().getAll()
+    }
 
     val root = JSONObject()
         .put("backupVersion", BACKUP_VERSION)
@@ -112,8 +113,11 @@ suspend fun restoreHabitBackup(
         }
     }
 
-    val habitIds = habits.map { it.id }.toSet()
-    require(completions.all { it.habitId in habitIds }) {
+    val habitIds = habits.map { it.id }
+    require(habitIds.size == habitIds.toSet().size) {
+        "Backup contains duplicate habit IDs"
+    }
+    require(completions.all { it.habitId in habitIds.toSet() }) {
         "Backup contains a completion for a missing habit"
     }
 
