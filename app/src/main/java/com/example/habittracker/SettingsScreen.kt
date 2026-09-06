@@ -49,12 +49,11 @@ import java.util.Date
 import java.util.Locale
 
 private const val PREFS_NAME = "habit_tracker"
-private const val THEME_KEY = "theme_mode"
 private const val DEFAULTS_CREATED_KEY = "defaults_created"
 private const val FEEDBACK_SUBJECT = "Habit Tracker Feedback"
 private const val ISSUE_URL = "https://github.com/menx61694-star/habit_tracker/issues"
 
-public enum class AppThemeMode(val storageValue: String, val label: String) {
+enum class AppThemeMode(val storageValue: String, val label: String) {
     System("system", "System"),
     Light("light", "Light"),
     Dark("dark", "Dark");
@@ -85,7 +84,7 @@ fun SettingsScreen(
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            runCatching {
+            try {
                 val backup = withContext(Dispatchers.IO) {
                     exportHabitBackup(database, preferences)
                 }
@@ -94,9 +93,8 @@ fun SettingsScreen(
                         output.writer(Charsets.UTF_8).use { writer -> writer.write(backup) }
                     } ?: error("Could not open the selected file")
                 }
-            }.onSuccess {
                 snackbarHostState.showSnackbar("Backup exported successfully")
-            }.onFailure { error ->
+            } catch (error: Exception) {
                 snackbarHostState.showSnackbar(
                     error.message ?: "Backup export failed"
                 )
@@ -109,21 +107,20 @@ fun SettingsScreen(
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            runCatching {
+            try {
                 val backup = withContext(Dispatchers.IO) {
                     context.contentResolver.openInputStream(uri)?.use { input ->
                         input.reader(Charsets.UTF_8).readText()
                     } ?: error("Could not read the selected file")
                 }
-                withContext(Dispatchers.IO) {
+                val result = withContext(Dispatchers.IO) {
                     restoreHabitBackup(database, preferences, backup)
                 }
-            }.onSuccess { result ->
                 result.themeMode?.let { onThemeModeChanged(AppThemeMode.fromStorage(it)) }
                 snackbarHostState.showSnackbar(
                     "Restored ${result.habitCount} habits and ${result.completionCount} completions"
                 )
-            }.onFailure { error ->
+            } catch (error: Exception) {
                 snackbarHostState.showSnackbar(
                     error.message ?: "Backup restore failed"
                 )
@@ -247,19 +244,20 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 val message = feedback.trim()
-                                if (message.isEmpty()) return@Button
-                                try {
-                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_SUBJECT, FEEDBACK_SUBJECT)
-                                        putExtra(Intent.EXTRA_TEXT, message)
-                                    }
-                                    context.startActivity(
-                                        Intent.createChooser(shareIntent, "Send feedback with")
-                                    )
-                                } catch (_: ActivityNotFoundException) {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("No app is available to send feedback")
+                                if (message.isNotEmpty()) {
+                                    try {
+                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_SUBJECT, FEEDBACK_SUBJECT)
+                                            putExtra(Intent.EXTRA_TEXT, message)
+                                        }
+                                        context.startActivity(
+                                            Intent.createChooser(shareIntent, "Send feedback with")
+                                        )
+                                    } catch (_: ActivityNotFoundException) {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("No app is available to send feedback")
+                                        }
                                     }
                                 }
                             },
