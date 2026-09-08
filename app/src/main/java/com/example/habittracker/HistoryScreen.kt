@@ -24,6 +24,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -149,12 +150,29 @@ private fun HistoryModeButton(
     modifier: Modifier,
     onClick: () -> Unit
 ) {
-    if (selected) {
-        TextButton(onClick = onClick, modifier = modifier) {
-            Text(label, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
         }
-    } else {
-        TextButton(onClick = onClick, modifier = modifier) { Text(label) }
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
     }
 }
 
@@ -235,25 +253,28 @@ private fun YearHistory(
         SimpleDateFormat("yyyy", Locale.getDefault()).format(year.time)
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        TextButton(onClick = onPrevious) { Text("‹") }
-        Text(yearTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        TextButton(onClick = onNext) { Text("›") }
-    }
+    PeriodHeader(
+        title = yearTitle,
+        onPrevious = onPrevious,
+        onNext = onNext
+    )
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
-        Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            StatItem("Completion", "$yearRate%", Modifier.weight(1f))
-            StatItem("Completed", "$yearCompleted/$yearScheduled", Modifier.weight(1f))
-            StatItem("Best streak", "$yearBestStreak", Modifier.weight(1f))
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                StatItem("Completion", "$yearRate%", Modifier.weight(1f))
+                StatItem("Completed", "$yearCompleted/$yearScheduled", Modifier.weight(1f))
+                StatItem("Best streak", "$yearBestStreak", Modifier.weight(1f))
+            }
+            LinearProgressIndicator(
+                progress = { yearRate / 100f },
+                modifier = Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(50)),
+                trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)
+            )
         }
     }
 
@@ -288,16 +309,23 @@ private fun YearMonthCard(title: String, rate: Int, completed: Int, bestStreak: 
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(title, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Text("$completed days", style = MaterialTheme.typography.bodySmall)
-            Spacer(modifier = Modifier.size(12.dp))
-            Text("$rate%", fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.size(12.dp))
-            Text("🔥 $bestStreak", style = MaterialTheme.typography.bodySmall)
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text("$rate%", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.height(7.dp))
+            LinearProgressIndicator(
+                progress = { rate / 100f },
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)),
+                trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+            )
+            Spacer(modifier = Modifier.height(7.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("$completed completed", style = MaterialTheme.typography.bodySmall)
+                Spacer(modifier = Modifier.weight(1f))
+                Text("Best streak $bestStreak", style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }
@@ -389,18 +417,15 @@ private fun buildMonthData(month: Calendar): List<CalendarDayData> {
 
 @Composable
 private fun CalendarLegend() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text("Mon", style = MaterialTheme.typography.labelSmall)
-        Text("Tue", style = MaterialTheme.typography.labelSmall)
-        Text("Wed", style = MaterialTheme.typography.labelSmall)
-        Text("Thu", style = MaterialTheme.typography.labelSmall)
-        Text("Fri", style = MaterialTheme.typography.labelSmall)
-        Text("Sat", style = MaterialTheme.typography.labelSmall)
-        Text("Sun", style = MaterialTheme.typography.labelSmall)
+    Row(modifier = Modifier.fillMaxWidth()) {
+        listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun").forEach { label ->
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.weight(1f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
     }
 }
 
@@ -426,7 +451,11 @@ private fun CalendarDay(day: CalendarDayData, completed: Boolean) {
             text = day.day.toString(),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = if (day.isToday || completed) FontWeight.Bold else FontWeight.Normal,
-            color = if (completed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            color = when {
+                completed -> MaterialTheme.colorScheme.onPrimary
+                day.isToday -> MaterialTheme.colorScheme.onSecondaryContainer
+                else -> MaterialTheme.colorScheme.onSurface
+            }
         )
     }
 }
@@ -437,6 +466,11 @@ private fun MonthHeader(monthOffset: Int, onPrevious: () -> Unit, onNext: () -> 
     val title = remember(month.timeInMillis) {
         SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.time)
     }
+    PeriodHeader(title = title, onPrevious = onPrevious, onNext = onNext)
+}
+
+@Composable
+private fun PeriodHeader(title: String, onPrevious: () -> Unit, onNext: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -460,13 +494,17 @@ private fun MonthStatsCard(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(18.dp)
-        ) {
-            StatItem("Completed", "$completedCount", Modifier.weight(1f))
-            StatItem("Completion", "$completionRate%", Modifier.weight(1f))
-            StatItem("Best streak", "$bestStreak", Modifier.weight(1f))
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                StatItem("Completed", "$completedCount", Modifier.weight(1f))
+                StatItem("Completion", "$completionRate%", Modifier.weight(1f))
+                StatItem("Best streak", "$bestStreak", Modifier.weight(1f))
+            }
+            LinearProgressIndicator(
+                progress = { completionRate / 100f },
+                modifier = Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(50)),
+                trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)
+            )
         }
     }
 }
