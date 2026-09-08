@@ -1,4 +1,4 @@
 package com.example.habittracker.data
 
-// Intentionally empty: backup validation tests live under androidTest because
-// restoreHabitBackup exercises Android Room and SharedPreferences APIs.
+// The real backup validation suite is an Android instrumentation test because
+// restoreHabitBackup exercises Room and SharedPreferences APIs.
