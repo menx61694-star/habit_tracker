@@ -370,6 +370,7 @@ private fun HabitCard(
     onDelete: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showActionsDialog by remember { mutableStateOf(false) }
     val accent = habitAccentColor(habit.color)
 
     Card(
@@ -378,12 +379,12 @@ private fun HabitCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(width = 5.dp, height = 48.dp)
+                    .size(width = 5.dp, height = 52.dp)
                     .clip(RoundedCornerShape(50))
                     .background(accent)
             )
@@ -397,8 +398,16 @@ private fun HabitCard(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "${habit.category} • ${habit.frequency} • $statusText",
-                    style = MaterialTheme.typography.bodySmall
+                    text = "${habit.category} • ${habit.frequency}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (doneToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (doneToday) FontWeight.SemiBold else FontWeight.Normal,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
             Checkbox(
@@ -406,9 +415,30 @@ private fun HabitCard(
                 onCheckedChange = { onToggle() },
                 enabled = enabled
             )
-            TextButton(onClick = onEdit) { Text("Edit") }
-            TextButton(onClick = { showDeleteDialog = true }) { Text("Delete") }
+            TextButton(onClick = { showActionsDialog = true }) {
+                Text("•••")
+            }
         }
+    }
+
+    if (showActionsDialog) {
+        AlertDialog(
+            onDismissRequest = { showActionsDialog = false },
+            title = { Text(habit.name) },
+            text = { Text("Choose an action for this habit.") },
+            confirmButton = {
+                Button(onClick = {
+                    showActionsDialog = false
+                    onEdit()
+                }) { Text("Edit") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = {
+                    showActionsDialog = false
+                    showDeleteDialog = true
+                }) { Text("Delete") }
+            }
+        )
     }
 
     if (showDeleteDialog) {
