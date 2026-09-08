@@ -14,12 +14,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -499,20 +502,42 @@ private fun HabitFormDialog(
     var color by remember { mutableStateOf(existingHabit?.color ?: habitColors.first()) }
     var frequency by remember { mutableStateOf(existingHabit?.frequency ?: habitFrequencies.first()) }
     val trimmedName = name.trim()
+    val formScrollState = rememberScrollState()
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (existingHabit == null) "Add Habit" else "Edit Habit") },
+        title = {
+            Column {
+                Text(if (existingHabit == null) "Add Habit" else "Edit Habit")
+                Text(
+                    "Set up your routine in a few taps",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(formScrollState),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Habit name") },
+                    placeholder = { Text("e.g. Read 20 pages") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Text("Icon", style = MaterialTheme.typography.labelLarge)
+
+                Text(
+                    "Icon",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     habitIcons.take(4).forEach { option ->
                         ChoiceButton(option, option == icon) { icon = option }
@@ -523,7 +548,12 @@ private fun HabitFormDialog(
                         ChoiceButton(option, option == icon) { icon = option }
                     }
                 }
-                Text("Category", style = MaterialTheme.typography.labelLarge)
+
+                Text(
+                    "Category",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     habitCategories.take(3).forEach { option ->
                         ChoiceButton(option, option == category) { category = option }
@@ -534,13 +564,23 @@ private fun HabitFormDialog(
                         ChoiceButton(option, option == category) { category = option }
                     }
                 }
-                Text("Color", style = MaterialTheme.typography.labelLarge)
+
+                Text(
+                    "Color",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     habitColors.forEach { option ->
                         ChoiceButton(option.replaceFirstChar { it.uppercase() }, option == color) { color = option }
                     }
                 }
-                Text("Frequency", style = MaterialTheme.typography.labelLarge)
+
+                Text(
+                    "Frequency",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     habitFrequencies.forEach { option ->
                         ChoiceButton(option, option == frequency) { frequency = option }
