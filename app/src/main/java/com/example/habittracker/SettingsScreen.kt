@@ -79,6 +79,8 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var showResetDialog by remember { mutableStateOf(false) }
+    var showLocalRestoreDialog by remember { mutableStateOf(false) }
+    var pendingLocalBackup by remember { mutableStateOf<String?>(null) }
     var feedback by rememberSaveable { mutableStateOf("") }
 
     val exportLauncher = rememberLauncherForActivityResult(
@@ -111,11 +113,10 @@ fun SettingsScreen(
                         input.reader(Charsets.UTF_8).readText()
                     } ?: error("Could not read the selected file")
                 }
-                val result = withContext(Dispatchers.IO) { restoreHabitBackup(database, preferences, backup) }
-                result.themeMode?.let { onThemeModeChanged(AppThemeMode.fromStorage(it)) }
-                snackbarHostState.showSnackbar("Restored ${result.habitCount} habits and ${result.completionCount} completions")
+                pendingLocalBackup = backup
+                showLocalRestoreDialog = true
             } catch (error: Exception) {
-                snackbarHostState.showSnackbar(error.message ?: "Backup restore failed")
+                snackbarHostState.showSnackbar(error.message ?: "Backup file could not be read")
             }
         }
     }
@@ -165,8 +166,14 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = { importLauncher.launch(arrayOf("application/json", "text/plain")) },
                             modifier = Modifier.weight(1f)
-                        ) { Text("Import") }
+                        ) { Text("Restore") }
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Restoring replaces the current local habits and completion history with the backup contents.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
@@ -245,6 +252,43 @@ fun SettingsScreen(
         }
     }
 
+    if (showLocalRestoreDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showLocalRestoreDialog = false
+                pendingLocalBackup = null
+            },
+            title = { Text("Restore this backup?") },
+            text = {
+                Text("Your current local habits and completion history will be replaced by this backup. Make sure you have exported anything you want to keep.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val backup = pendingLocalBackup ?: return@Button
+                    showLocalRestoreDialog = false
+                    pendingLocalBackup = null
+                    scope.launch {
+                        try {
+                            val result = withContext(Dispatchers.IO) {
+                                restoreHabitBackup(database, preferences, backup)
+                            }
+                            result.themeMode?.let { onThemeModeChanged(AppThemeMode.fromStorage(it)) }
+                            snackbarHostState.showSnackbar("Restored ${result.habitCount} habits and ${result.completionCount} completions")
+                        } catch (error: Exception) {
+                            snackbarHostState.showSnackbar(error.message ?: "Backup restore failed")
+                        }
+                    }
+                }) { Text("Restore") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showLocalRestoreDialog = false
+                    pendingLocalBackup = null
+                }) { Text("Cancel") }
+            }
+        )
+    }
+
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
@@ -277,6 +321,7 @@ private fun CloudBackupCard(
     var registerMode by rememberSaveable { mutableStateOf(false) }
     var signedIn by remember { mutableStateOf(FirebaseCloudBackup.currentUser != null) }
     var busy by remember { mutableStateOf(false) }
+    var showCloudRestoreDialog by remember { mutableStateOf(false) }
 
     fun friendlyFirebaseError(error: Exception, fallback: String): String {
         val message = error.message.orEmpty()
@@ -294,7 +339,7 @@ private fun CloudBackupCard(
     SettingsCard(title = "Cloud backup") {
         if (signedIn) {
             Text(
-                "Signed in as ${FirebaseCloudBackup.currentUser?.email ?: "your account"}. Your latest local backup is stored securely in your Firebase project.",
+                "Signed in as ${FirebaseCloudBackup.currentUser?.email ?: "your account"}. Your latest local backup is stored in your Firebase project.",
                 style = MaterialTheme.typography.bodyMedium
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -320,25 +365,18 @@ private fun CloudBackupCard(
                 ) { Text(if (busy) "Working…" else "Upload") }
                 OutlinedButton(
                     onClick = {
-                        if (busy) return@OutlinedButton
-                        scope.launch {
-                            busy = true
-                            try {
-                                val backup = withContext(Dispatchers.IO) { FirebaseCloudBackup.downloadBackup() }
-                                val result = withContext(Dispatchers.IO) { restoreHabitBackup(database, preferences, backup) }
-                                snackbarHostState.showSnackbar("Restored ${result.habitCount} habits and ${result.completionCount} completions")
-                            } catch (error: Exception) {
-                                snackbarHostState.showSnackbar(friendlyFirebaseError(error, "Cloud restore failed"))
-                            } finally {
-                                busy = false
-                            }
-                        }
+                        if (!busy) showCloudRestoreDialog = true
                     },
                     enabled = !busy,
                     modifier = Modifier.weight(1f)
-                ) { Text(if (busy) "Working…" else "Download") }
+                ) { Text("Restore") }
             }
             Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Cloud restore replaces the current local data with the latest cloud backup.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             TextButton(
                 onClick = {
                     if (!busy) {
@@ -405,6 +443,37 @@ private fun CloudBackupCard(
                 ) { Text(if (registerMode) "Use sign in" else "Create account") }
             }
         }
+    }
+
+    if (showCloudRestoreDialog) {
+        AlertDialog(
+            onDismissRequest = { showCloudRestoreDialog = false },
+            title = { Text("Restore cloud backup?") },
+            text = {
+                Text("The latest cloud backup will replace your current local habits and completion history. Export your current data first if you need to keep it.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    showCloudRestoreDialog = false
+                    scope.launch {
+                        busy = true
+                        try {
+                            val backup = withContext(Dispatchers.IO) { FirebaseCloudBackup.downloadBackup() }
+                            val result = withContext(Dispatchers.IO) { restoreHabitBackup(database, preferences, backup) }
+                            result.themeMode?.let { }
+                            snackbarHostState.showSnackbar("Restored ${result.habitCount} habits and ${result.completionCount} completions")
+                        } catch (error: Exception) {
+                            snackbarHostState.showSnackbar(friendlyFirebaseError(error, "Cloud restore failed"))
+                        } finally {
+                            busy = false
+                        }
+                    }
+                }) { Text("Restore") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCloudRestoreDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 
