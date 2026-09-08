@@ -26,7 +26,7 @@ private val LightColors = lightColorScheme(
 
 private val DarkColors = darkColorScheme(
     primary = HabitGreenLight,
-    onPrimary = ColorTokens.HabitGreenOnPrimaryDark,
+    onPrimary = HabitGreen,
     primaryContainer = ColorTokens.HabitGreenContainerDark,
     onPrimaryContainer = ColorTokens.HabitGreenOnContainerDark,
     secondary = HabitBlueLight,
