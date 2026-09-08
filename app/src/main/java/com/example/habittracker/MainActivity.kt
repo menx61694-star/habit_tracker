@@ -3,6 +3,9 @@ package com.example.habittracker
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -321,6 +324,11 @@ private fun HabitHomeScreen() {
 @Composable
 private fun TodaySummary(total: Int, completed: Int) {
     val progress = if (total == 0) 0f else completed.toFloat() / total.toFloat()
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 350),
+        label = "todayProgress"
+    )
     val remaining = (total - completed).coerceAtLeast(0)
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -346,7 +354,7 @@ private fun TodaySummary(total: Int, completed: Int) {
             }
             Spacer(modifier = Modifier.height(14.dp))
             LinearProgressIndicator(
-                progress = { progress },
+                progress = { animatedProgress },
                 modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)),
                 trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
             )
@@ -375,11 +383,30 @@ private fun HabitCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showActionsDialog by remember { mutableStateOf(false) }
     val accent = habitAccentColor(habit.color)
+    val containerColor by animateColorAsState(
+        targetValue = if (doneToday) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        animationSpec = tween(durationMillis = 220),
+        label = "habitCardContainer"
+    )
+    val statusColor by animateColorAsState(
+        targetValue = if (doneToday) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = tween(durationMillis = 180),
+        label = "habitStatusColor"
+    )
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (doneToday) 2.dp else 1.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
@@ -408,7 +435,7 @@ private fun HabitCard(
                 Text(
                     text = statusText,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (doneToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = statusColor,
                     fontWeight = if (doneToday) FontWeight.SemiBold else FontWeight.Normal,
                     modifier = Modifier.padding(top = 2.dp)
                 )
@@ -464,7 +491,11 @@ private fun HabitCard(
 
 @Composable
 private fun BoxIndicator(done: Boolean, accent: Color) {
-    val color = if (done) accent else MaterialTheme.colorScheme.surfaceVariant
+    val color by animateColorAsState(
+        targetValue = if (done) accent else MaterialTheme.colorScheme.surfaceVariant,
+        animationSpec = tween(durationMillis = 180),
+        label = "habitIndicator"
+    )
     Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(color))
 }
 
