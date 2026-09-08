@@ -1,3 +1,3 @@
 package com.example.habittracker.data
 
-// Backup validation tests intentionally run as instrumentation tests.
+// Instrumentation suite is located under app/src/androidTest.
